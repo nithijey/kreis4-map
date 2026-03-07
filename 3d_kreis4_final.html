@@ -78,17 +78,45 @@
     let pointsVisible = true;
 
     function popupHtml(p) {
-      const title = [p.strasse, p.hausnummer].filter(Boolean).join(" ").trim() || "Gebäude";
-      return `
-        <div class="popup-title">${esc(title)}</div>
-        <div class="popup-row"><span class="popup-key">EGID:</span> ${esc(p.egid)}</div>
-        <div class="popup-row"><span class="popup-key">Baujahr:</span> ${esc(p.baujahr)}</div>
-        <div class="popup-row"><span class="popup-key">Grundfläche:</span> ${esc(p.grundflaeche_m2)} m²</div>
-        <div class="popup-row"><span class="popup-key">Nutzung:</span> ${esc(p.gebaeude_nutzung)}</div>
-        <div class="popup-row"><span class="popup-key">Qualität:</span> ${esc(p.qualitaet)}</div>
-        <div class="popup-row"><span class="popup-key">PLZ / Ort:</span> ${esc(p.plz)} ${esc(p.ortschaft)}</div>
-      `;
-    }
+
+  const title = [p.strasse, p.hausnummer].filter(Boolean).join(" ");
+
+  return `
+  <div style="font-family:system-ui,Arial,sans-serif;min-width:260px">
+
+    <div style="
+      font-size:16px;
+      font-weight:700;
+      margin-bottom:8px;
+      color:#111827;
+    ">
+      ${title}
+    </div>
+
+    <div style="border-top:1px solid #eee;margin-bottom:8px"></div>
+
+    <div style="display:grid;grid-template-columns:120px 1fr;gap:4px;font-size:13px">
+
+      <div style="color:#6b7280">EGID</div>
+      <div>${p.egid ?? "-"}</div>
+
+      <div style="color:#6b7280">Baujahr</div>
+      <div>${p.baujahr ?? "-"}</div>
+
+      <div style="color:#6b7280">Grundfläche</div>
+      <div>${p.grundflaeche_m2 ?? "-"} m²</div>
+
+      <div style="color:#6b7280">Gebäudenutzung</div>
+      <div>${p.gebaeude_nutzung ?? "-"}</div>
+
+      <div style="color:#6b7280">Qualität</div>
+      <div>${p.qualitaet ?? "-"}</div>
+
+    </div>
+
+  </div>
+  `;
+}
 
     map.on("load", async () => {
       map.addSource("kreis4-boundary", { type: "geojson", data: "assets/kreis4_boundary.geojson" });
