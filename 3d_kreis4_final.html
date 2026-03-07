@@ -43,6 +43,20 @@
 <body>
   <div id="map"></div>
   <div class="hud">
+    <div id="statsPanel" style="
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid #e5e7eb;
+  font-size:13px;
+  line-height:1.5;
+  color:#111827;
+">
+  <div><strong>Statistik</strong></div>
+  <div>Anzahl Punkte: <span id="stat-count">-</span></div>
+  <div>Ø Baujahr: <span id="stat-year">-</span></div>
+  <div>Ø Grundfläche: <span id="stat-area">-</span> m²</div>
+  <div>Häufigste Nutzung: <span id="stat-use">-</span></div>
+</div>
     <h1>Kreis 4 – 3D mit Kugeln</h1>
     <p>3D-Gebäude kommen direkt von der Basemap. Die Kugeln schweben in einer einfachen 30m-Optik darüber. Die Kreis-4-Grenze bleibt immer sichtbar.</p>
     <div class="buttons">
@@ -117,6 +131,63 @@
   </div>
   `;
 }
+    function updateStats(features) {
+  const countEl = document.getElementById("stat-count");
+  const yearEl = document.getElementById("stat-year");
+  const areaEl = document.getElementById("stat-area");
+  const useEl = document.getElementById("stat-use");
+
+  if (!features || !features.length) {
+    countEl.textContent = "-";
+    yearEl.textContent = "-";
+    areaEl.textContent = "-";
+    useEl.textContent = "-";
+    return;
+  }
+
+  let count = features.length;
+
+  let years = [];
+  let areas = [];
+  let useCount = {};
+
+  features.forEach(f => {
+    const p = f.properties || {};
+
+    const year = Number(p.baujahr);
+    if (!isNaN(year) && year > 0) years.push(year);
+
+    const area = Number(p.grundflaeche_m2);
+    if (!isNaN(area) && area > 0) areas.push(area);
+
+    const use = (p.gebaeude_nutzung || "").toString().trim();
+    if (use) {
+      useCount[use] = (useCount[use] || 0) + 1;
+    }
+  });
+
+  const avgYear = years.length
+    ? Math.round(years.reduce((a, b) => a + b, 0) / years.length)
+    : "-";
+
+  const avgArea = areas.length
+    ? (areas.reduce((a, b) => a + b, 0) / areas.length).toFixed(1)
+    : "-";
+
+  let topUse = "-";
+  let topUseCount = 0;
+  Object.entries(useCount).forEach(([key, val]) => {
+    if (val > topUseCount) {
+      topUse = key;
+      topUseCount = val;
+    }
+  });
+
+  countEl.textContent = count;
+  yearEl.textContent = avgYear;
+  areaEl.textContent = avgArea;
+  useEl.textContent = topUse;
+}
 
     map.on("load", async () => {
       map.addSource("kreis4-boundary", { type: "geojson", data: "assets/kreis4_boundary.geojson" });
@@ -128,11 +199,13 @@
       });
 
       const [boundaryRes, pointsRes] = await Promise.all([
-        fetch("assets/kreis4_boundary.geojson"),
-        fetch("assets/points.geojson")
-      ]);
-      const boundary = await boundaryRes.json();
-      const points = await pointsRes.json();
+  fetch("assets/kreis4_boundary.geojson"),
+  fetch("assets/points.geojson")
+]);
+const boundary = await boundaryRes.json();
+const points = await pointsRes.json();
+
+updateStats(points.features || []);
 
       if (boundary && boundary.features && boundary.features.length) {
         const bounds = new maplibregl.LngLatBounds();
