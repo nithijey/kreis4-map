@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kreis 4 – Finaler Stand</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f7f7f8;color:#111827}
+    .wrap{max-width:920px;margin:40px auto;padding:0 20px}
+    h1{margin:0 0 10px 0}
+    p{color:#4b5563}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:24px}
+    a.card{display:block;text-decoration:none;color:inherit;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    a.card:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(0,0,0,.08)}
+    .title{font-weight:700;margin-bottom:6px}
+    .small{font-size:13px;color:#6b7280}
+    code{background:#eef2ff;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Kreis 4 – Finaler Stand</h1>
+    <p>Lokal starten mit <code>python -m http.server 8000</code> und dann <code>http://127.0.0.1:8000/</code> öffnen.</p>
+    <div class="grid">
+      <a class="card" href="2d.html">
+        <div class="title">2D Ansicht</div>
+        <div class="small">Leaflet-Karte mit klickbaren Punkten und Popups.</div>
+      </a>
+      <a class="card" href="3d_kreis4_final.html">
+        <div class="title">3D Ansicht mit Kugeln</div>
+        <div class="small">Komplette Zürich-3D-Basemap, Kreis-4-Grenze und schwebende Kugeln in einfacher 30m-Optik.</div>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

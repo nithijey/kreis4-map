@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kreis 4 – 3D Basemap</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #map { height: 100%; width: 100%; }
+    .hud{
+      position: absolute; z-index: 10; left: 14px; top: 14px;
+      background: rgba(255,255,255,.96); padding: 12px 14px; border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.12); max-width: 430px;
+    }
+    .hud h1{ margin:0 0 4px 0; font-size: 20px; }
+    .hud p{ margin:0; color:#555; font-size: 13px; line-height: 1.35; }
+    .note {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #666;
+    }
+    .maplibregl-popup-content {
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-width: 260px;
+    }
+    .popup-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    .popup-row { margin: 2px 0; }
+    .popup-key { color: #666; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="hud">
+    <h1>Kreis 4 – 3D</h1>
+    <p>3D-Gebäude kommen von der Basemap. Deine Punkte liegen darüber und zeigen beim Klick die Informationen.</p>
+    <div class="note">Dateien im gleichen Ordner erwartet: <code>assets/points.geojson</code> und <code>assets/kreis4_boundary.geojson</code>.</div>
+  </div>
+
+  <script>
+    const CENTER = [8.531, 47.377];
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://tiles.openfreemap.org/styles/bright",
+      center: CENTER,
+      zoom: 15.8,
+      pitch: 58,
+      bearing: -18,
+      antialias: true
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    map.on("load", async () => {
+      const layers = map.getStyle().layers || [];
+      let labelLayerId = null;
+      for (const layer of layers) {
+        if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) {
+          labelLayerId = layer.id;
+          break;
+        }
+      }
+
+      if (!map.getSource("openfreemap")) {
+        map.addSource("openfreemap", {
+          type: "vector",
+          url: "https://tiles.openfreemap.org/planet"
+        });
+      }
+
+      map.addLayer({
+        id: "3d-buildings",
+        source: "openfreemap",
+        "source-layer": "building",
+        type: "fill-extrusion",
+        minzoom: 15,
+        filter: ["!=", ["get", "hide_3d"], true],
+        paint: {
+          "fill-extrusion-color": "#d7d7d7",
+          "fill-extrusion-height": [
+            "interpolate", ["linear"], ["zoom"],
+            15, 0,
+            16, ["coalesce", ["get", "render_height"], 12]
+          ],
+          "fill-extrusion-base": [
+            "case",
+            [">=", ["zoom"], 16],
+            ["coalesce", ["get", "render_min_height"], 0],
+            0
+          ],
+          "fill-extrusion-opacity": 0.9
+        }
+      }, labelLayerId || undefined);
+
+      map.addSource("kreis4-boundary", {
+        type: "geojson",
+        data: "assets/kreis4_boundary.geojson"
+      });
+
+      map.addLayer({
+        id: "kreis4-boundary-line",
+        type: "line",
+        source: "kreis4-boundary",
+        paint: {
+          "line-color": "#d7191c",
+          "line-width": 3
+        }
+      });
+
+      map.addSource("kreis4-points", {
+        type: "geojson",
+        data: "assets/points.geojson"
+      });
+
+      map.addLayer({
+        id: "kreis4-points-circle",
+        type: "circle",
+        source: "kreis4-points",
+        paint: {
+          "circle-radius": 6,
+          "circle-color": "#ff8a00",
+          "circle-stroke-color": "#2b2b2b",
+          "circle-stroke-width": 1.2
+        }
+      });
+
+      map.on("mouseenter", "kreis4-points-circle", () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+
+      map.on("mouseleave", "kreis4-points-circle", () => {
+        map.getCanvas().style.cursor = "";
+      });
+
+      map.on("click", "kreis4-points-circle", (e) => {
+        const f = e.features && e.features[0];
+        if (!f) return;
+
+        const p = f.properties || {};
+        const title = [p.strasse, p.hausnummer].filter(Boolean).join(" ").trim() || "Gebäude";
+        const html = `
+          <div class="popup-title">${esc(title)}</div>
+          <div class="popup-row"><span class="popup-key">EGID:</span> ${esc(p.egid)}</div>
+          <div class="popup-row"><span class="popup-key">Baujahr:</span> ${esc(p.baujahr)}</div>
+          <div class="popup-row"><span class="popup-key">Grundfläche:</span> ${esc(p.grundflaeche_m2)} m²</div>
+          <div class="popup-row"><span class="popup-key">Nutzung:</span> ${esc(p.gebaeude_nutzung)}</div>
+          <div class="popup-row"><span class="popup-key">Qualität:</span> ${esc(p.qualitaet)}</div>
+          <div class="popup-row"><span class="popup-key">PLZ / Ort:</span> ${esc(p.plz)} ${esc(p.ortschaft)}</div>
+        `;
+
+        new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: "340px" })
+          .setLngLat(e.lngLat)
+          .setHTML(html)
+          .addTo(map);
+      });
+    });
+  </script>
+</body>
+</html>

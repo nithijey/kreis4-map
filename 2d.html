@@ -1,0 +1,18 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Kreis 4 – 2D</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><style>html,body,#map{height:100%;margin:0}.popup-table{border-collapse:collapse}.popup-table td{padding:2px 6px;vertical-align:top}.popup-table td:first-child{color:#555}</style></head><body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+const map=L.map('map');
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap'}).addTo(map);
+function popupHTML(p){
+ const keys=['strasse','hausnummer','plz','ortschaft','baujahr','grundflaeche_m2','gebaeudealter_2026','gebaeude_nutzung','qualitaet','oew_typ','bev_pers_n','bev_dichte_pha','egid_int'];
+ let rows='';
+ for(const k of keys){if(p[k]!==undefined&&p[k]!==null&&p[k]!==''){rows+=`<tr><td><b>${k}</b></td><td>${p[k]}</td></tr>`;}}
+ return `<table class="popup-table">${rows}</table>`;
+}
+Promise.all([
+ fetch('assets/kreis4_boundary.geojson').then(r=>r.json()),
+ fetch('assets/points.geojson').then(r=>r.json())
+]).then(([b,pts])=>{
+ const bl=L.geoJSON(b,{style:{color:'#e11',weight:2,fillOpacity:0}}).addTo(map);
+ map.fitBounds(bl.getBounds());
+ L.geoJSON(pts,{pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:5,weight:1,fillOpacity:0.85}),onEachFeature:(f,l)=>l.bindPopup(popupHTML(f.properties),{maxWidth:380})}).addTo(map);
+});
+</script></body></html>

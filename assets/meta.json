@@ -1,0 +1,9 @@
+{
+  "crs": "EPSG:2056",
+  "origin": {
+    "x": 2681505.4605,
+    "y": 1248254.171,
+    "z": 396.856
+  },
+  "buildings_note": "Buildings are simplified convex hulls with height from z-range."
+}

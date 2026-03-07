@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kreis 4 – 3D mit Kugeln</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #map { height: 100%; width: 100%; }
+    .hud{
+      position:absolute; z-index:10; left:14px; top:14px;
+      background:rgba(255,255,255,.96); padding:12px 14px; border-radius:12px;
+      box-shadow:0 8px 30px rgba(0,0,0,.14); max-width:460px;
+    }
+    .hud h1{ margin:0 0 4px 0; font-size:20px; }
+    .hud p{ margin:0; color:#555; font-size:13px; line-height:1.35; }
+    .buttons{ margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; }
+    button{
+      border:0; border-radius:10px; padding:8px 10px;
+      background:#111827; color:#fff; cursor:pointer; font-size:13px;
+    }
+    button.secondary{ background:#f3f4f6; color:#111827; border:1px solid #d1d5db; }
+    .bubble{
+      width:18px; height:18px; border-radius:50%;
+      background:#ff8a00; border:2px solid #1f2937;
+      box-shadow:0 0 0 8px rgba(255,138,0,0.14);
+      cursor:pointer;
+      transform: translate(-50%, -50%);
+    }
+    .bubble.hidden { display:none; }
+    .maplibregl-popup-content {
+      font:14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      border-radius:10px; padding:12px 14px; min-width:270px;
+    }
+    .popup-title { font-weight:700; margin-bottom:6px; font-size:15px; }
+    .popup-row { margin:2px 0; }
+    .popup-key { color:#666; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="hud">
+    <h1>Kreis 4 – 3D mit Kugeln</h1>
+    <p>3D-Gebäude kommen direkt von der Basemap. Die Kugeln schweben in einer einfachen 30m-Optik darüber. Die Kreis-4-Grenze bleibt immer sichtbar.</p>
+    <div class="buttons">
+      <button id="togglePoints">Kugeln ausblenden</button>
+      <button id="resetView" class="secondary">Ansicht zurücksetzen</button>
+    </div>
+  </div>
+
+  <script>
+    const CENTER = [8.531, 47.377];
+    const START = { center: CENTER, zoom: 15.8, pitch: 60, bearing: -20 };
+    const FLOAT_PIXELS = 45; // einfache 30m-Optik
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://tiles.openfreemap.org/styles/liberty",
+      center: START.center,
+      zoom: START.zoom,
+      pitch: START.pitch,
+      bearing: START.bearing,
+      antialias: true
+    });
+
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    let pointMarkers = [];
+    let pointsVisible = true;
+
+    function popupHtml(p) {
+      const title = [p.strasse, p.hausnummer].filter(Boolean).join(" ").trim() || "Gebäude";
+      return `
+        <div class="popup-title">${esc(title)}</div>
+        <div class="popup-row"><span class="popup-key">EGID:</span> ${esc(p.egid)}</div>
+        <div class="popup-row"><span class="popup-key">Baujahr:</span> ${esc(p.baujahr)}</div>
+        <div class="popup-row"><span class="popup-key">Grundfläche:</span> ${esc(p.grundflaeche_m2)} m²</div>
+        <div class="popup-row"><span class="popup-key">Nutzung:</span> ${esc(p.gebaeude_nutzung)}</div>
+        <div class="popup-row"><span class="popup-key">Qualität:</span> ${esc(p.qualitaet)}</div>
+        <div class="popup-row"><span class="popup-key">PLZ / Ort:</span> ${esc(p.plz)} ${esc(p.ortschaft)}</div>
+      `;
+    }
+
+    map.on("load", async () => {
+      map.addSource("kreis4-boundary", { type: "geojson", data: "assets/kreis4_boundary.geojson" });
+      map.addLayer({
+        id: "kreis4-boundary-line",
+        type: "line",
+        source: "kreis4-boundary",
+        paint: { "line-color": "#dc2626", "line-width": 3 }
+      });
+
+      const [boundaryRes, pointsRes] = await Promise.all([
+        fetch("assets/kreis4_boundary.geojson"),
+        fetch("assets/points.geojson")
+      ]);
+      const boundary = await boundaryRes.json();
+      const points = await pointsRes.json();
+
+      if (boundary && boundary.features && boundary.features.length) {
+        const bounds = new maplibregl.LngLatBounds();
+        const addCoords = coords => coords.forEach(c => Array.isArray(c[0]) ? addCoords(c) : bounds.extend(c));
+        boundary.features.forEach(f => addCoords(f.geometry.coordinates));
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 40, duration: 0, pitch: START.pitch, bearing: START.bearing });
+        }
+      }
+
+      (points.features || []).forEach(f => {
+        const coords = f.geometry && f.geometry.coordinates;
+        if (!coords || coords.length < 2) return;
+
+        const el = document.createElement("div");
+        el.className = "bubble";
+        el.title = "Infos öffnen";
+        el.style.marginTop = `-${FLOAT_PIXELS}px`;
+
+        const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: "340px", offset: 18 })
+          .setHTML(popupHtml(f.properties || {}));
+
+        const marker = new maplibregl.Marker({ element: el, anchor: "bottom" })
+          .setLngLat(coords)
+          .setPopup(popup)
+          .addTo(map);
+
+        pointMarkers.push(marker);
+      });
+    });
+
+    document.getElementById("togglePoints").addEventListener("click", () => {
+      pointsVisible = !pointsVisible;
+      pointMarkers.forEach(m => {
+        const el = m.getElement();
+        if (pointsVisible) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+      });
+      document.getElementById("togglePoints").textContent = pointsVisible ? "Kugeln ausblenden" : "Kugeln einblenden";
+    });
+
+    document.getElementById("resetView").addEventListener("click", () => {
+      map.easeTo({
+        center: START.center,
+        zoom: START.zoom,
+        pitch: START.pitch,
+        bearing: START.bearing,
+        duration: 900
+      });
+    });
+  </script>
+</body>
+</html>
